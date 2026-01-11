@@ -79,13 +79,21 @@ pub struct EntryResolved {
     pub mismatch: bool,
 }
 
-pub fn load_week(path: &Path, default_week_start: NaiveDate) -> Result<WeekData, LedgerError> {
+pub fn load_week_if_exists(
+    path: &Path,
+    default_week_start: NaiveDate,
+) -> Result<Option<WeekData>, LedgerError> {
     match fs::read_to_string(path) {
-        Ok(content) => Ok(parse_ledger(&content, default_week_start)),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-            Ok(WeekData::new(default_week_start))
-        }
+        Ok(content) => Ok(Some(parse_ledger(&content, default_week_start))),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(err) => Err(LedgerError::Io(err)),
+    }
+}
+
+pub fn load_week(path: &Path, default_week_start: NaiveDate) -> Result<WeekData, LedgerError> {
+    match load_week_if_exists(path, default_week_start)? {
+        Some(week) => Ok(week),
+        None => Ok(WeekData::new(default_week_start)),
     }
 }
 
