@@ -1,65 +1,11 @@
-use std::path::PathBuf;
-
-use chrono::NaiveDate;
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table, TableState, Wrap};
 
-use crate::ledger::{
-    Day, Totals, WeekData, compute_totals, format_minutes, resolve_entry, week_dates,
-};
-
-#[derive(Debug, Clone)]
-pub struct TaskDisplay {
-    pub key: String,
-    pub name: String,
-}
-
-pub struct App {
-    pub week: WeekData,
-    pub file_path: PathBuf,
-    pub tasks: Vec<TaskDisplay>,
-    pub selected_day: usize,
-    pub selected_task: usize,
-    pub totals: Totals,
-    pub status: String,
-}
-
-impl App {
-    pub fn new(week: WeekData, file_path: PathBuf) -> Self {
-        let totals = compute_totals(&week);
-        let tasks = build_tasks(&totals);
-        let status = format!("Warnings: {}", week.warnings.len());
-        Self {
-            week,
-            file_path,
-            tasks,
-            selected_day: 0,
-            selected_task: 0,
-            totals,
-            status,
-        }
-    }
-
-    pub fn refresh(&mut self) {
-        self.totals = compute_totals(&self.week);
-        self.tasks = build_tasks(&self.totals);
-        if self.selected_task >= self.tasks.len() {
-            self.selected_task = self.tasks.len().saturating_sub(1);
-        }
-        self.status = format!("Warnings: {}", self.week.warnings.len());
-    }
-
-    pub fn selected_date(&self) -> NaiveDate {
-        let dates = week_dates(self.week.week_start);
-        dates
-            .get(self.selected_day)
-            .copied()
-            .unwrap_or(self.week.week_start)
-    }
-}
+use crate::app::App;
+use crate::ledger::{Day, format_minutes, resolve_entry, week_dates};
 
 pub fn draw(frame: &mut Frame<'_>, app: &App) {
     let root = Layout::default()
@@ -221,15 +167,4 @@ fn build_day_lines(day: &Day, lines: &mut Vec<Line>) {
             lines.push(Line::from(sub_line));
         }
     }
-}
-
-fn build_tasks(totals: &Totals) -> Vec<TaskDisplay> {
-    totals
-        .display_names
-        .iter()
-        .map(|(key, name)| TaskDisplay {
-            key: key.clone(),
-            name: name.clone(),
-        })
-        .collect()
 }
