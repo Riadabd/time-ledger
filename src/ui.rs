@@ -2,12 +2,12 @@ use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table, TableState, Wrap};
+use ratatui::widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table, TableState, Wrap};
 
 use crate::app::App;
 use crate::ledger::{Day, format_minutes, resolve_entry, week_dates};
 
-pub fn draw(frame: &mut Frame<'_>, app: &App) {
+pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
     let root = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(3), Constraint::Length(2)])
@@ -21,7 +21,27 @@ pub fn draw(frame: &mut Frame<'_>, app: &App) {
     draw_week_table(frame, app, main[0]);
     draw_day_detail(frame, app, main[1]);
 
-    let footer = Paragraph::new(Line::from(vec![
+    let footer = build_footer(app);
+    frame.render_widget(footer, root[1]);
+
+    if app.showing_warnings() {
+        draw_warnings_overlay(frame, app);
+    }
+}
+
+fn build_footer(app: &App) -> Paragraph<'_> {
+    let line = if app.showing_warnings() {
+        warnings_footer_line(app)
+    } else {
+        main_footer_line(app)
+    };
+    Paragraph::new(line).block(Block::default().borders(Borders::TOP))
+}
+
+fn main_footer_line(app: &App) -> Line<'_> {
+    Line::from(vec![
+        Span::styled("Esc", Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw("/"),
         Span::styled("q", Style::default().add_modifier(Modifier::BOLD)),
         Span::raw(" quit  "),
         Span::styled("←/→", Style::default().add_modifier(Modifier::BOLD)),
@@ -30,10 +50,28 @@ pub fn draw(frame: &mut Frame<'_>, app: &App) {
         Span::raw(" task  "),
         Span::styled("s", Style::default().add_modifier(Modifier::BOLD)),
         Span::raw(" save  "),
+        Span::styled("w", Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw(" show warnings  "),
         Span::raw(&app.status),
-    ]))
-    .block(Block::default().borders(Borders::TOP));
-    frame.render_widget(footer, root[1]);
+    ])
+}
+
+fn warnings_footer_line(app: &App) -> Line<'_> {
+    Line::from(vec![
+        Span::styled("Esc", Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw("/"),
+        Span::styled("q", Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw(" close  "),
+        Span::styled("↑/↓", Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw(" scroll  "),
+        Span::styled("PgUp/PgDn", Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw(" page  "),
+        Span::styled("Home/End", Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw(" jump  "),
+        Span::styled("w", Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw(" close warnings  "),
+        Span::raw(&app.status),
+    ])
 }
 
 fn draw_week_table(frame: &mut Frame<'_>, app: &App, area: Rect) {
@@ -167,4 +205,52 @@ fn build_day_lines(day: &Day, lines: &mut Vec<Line>) {
             lines.push(Line::from(sub_line));
         }
     }
+}
+
+fn draw_warnings_overlay(frame: &mut Frame<'_>, app: &mut App) {
+    let area = centered_rect(70, 60, frame.area());
+    frame.render_widget(Clear, area);
+
+    let mut lines: Vec<Line> = Vec::new();
+    if app.week.warnings.is_empty() {
+        lines.push(Line::from("No warnings"));
+    } else {
+        for warning in &app.week.warnings {
+            lines.push(Line::from(format!("* {warning}")));
+        }
+    }
+
+    let content_height = area.height.saturating_sub(2) as usize;
+    app.set_warnings_page_size(content_height.max(1));
+    let scroll = app.warnings_scroll().min(u16::MAX as usize) as u16;
+
+    let paragraph = Paragraph::new(lines)
+        .block(Block::default().borders(Borders::ALL).title("Warnings"))
+        .alignment(Alignment::Left)
+        .wrap(Wrap { trim: false })
+        .scroll((scroll, 0));
+
+    frame.render_widget(paragraph, area);
+}
+
+fn centered_rect(percent_x: u16, percent_y: u16, rect: Rect) -> Rect {
+    let vertical = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - percent_y) / 2),
+            Constraint::Percentage(percent_y),
+            Constraint::Percentage((100 - percent_y) / 2),
+        ])
+        .split(rect);
+
+    let horizontal = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - percent_x) / 2),
+            Constraint::Percentage(percent_x),
+            Constraint::Percentage((100 - percent_x) / 2),
+        ])
+        .split(vertical[1]);
+
+    horizontal[1]
 }

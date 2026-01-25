@@ -15,6 +15,10 @@ pub struct TaskDisplay {
     pub name: String,
 }
 
+enum Overlay {
+    Warnings(WarningsOverlayState),
+}
+
 pub struct App {
     pub week: WeekData,
     pub file_path: PathBuf,
@@ -23,6 +27,12 @@ pub struct App {
     pub selected_task: usize,
     pub totals: Totals,
     pub status: String,
+    overlay_type: Option<Overlay>,
+}
+
+struct WarningsOverlayState {
+    scroll: usize,
+    page_size: usize,
 }
 
 impl App {
@@ -38,6 +48,7 @@ impl App {
             selected_task: 0,
             totals,
             status,
+            overlay_type: None,
         }
     }
 
@@ -48,6 +59,10 @@ impl App {
             self.selected_task = self.tasks.len().saturating_sub(1);
         }
         self.status = format!("Warnings: {}", self.week.warnings.len());
+        let line_count = self.warnings_line_count();
+        if let Some(state) = self.warnings_overlay_state_mut() {
+            state.clamp_scroll(line_count);
+        }
     }
 
     pub fn selected_date(&self) -> NaiveDate {
@@ -59,6 +74,87 @@ impl App {
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> Result<bool, Box<dyn Error>> {
+        if self.showing_warnings() {
+            let line_count = self.warnings_line_count();
+            // Modal overlay: consume navigation keys so the main UI doesn't move underneath.
+            match key {
+                KeyEvent {
+                    code: KeyCode::Char('w'),
+                    modifiers: KeyModifiers::NONE,
+                    ..
+                } => {
+                    self.overlay_type = None;
+                    return Ok(false);
+                }
+                KeyEvent {
+                    code: KeyCode::Char('q'),
+                    ..
+                }
+                | KeyEvent {
+                    code: KeyCode::Esc, ..
+                } => {
+                    self.overlay_type = None;
+                    return Ok(false);
+                }
+                KeyEvent {
+                    code: KeyCode::Up, ..
+                } => {
+                    if let Some(state) = self.warnings_overlay_state_mut() {
+                        state.scroll_by(-1, line_count);
+                    }
+                    return Ok(false);
+                }
+                KeyEvent {
+                    code: KeyCode::Down,
+                    ..
+                } => {
+                    if let Some(state) = self.warnings_overlay_state_mut() {
+                        state.scroll_by(1, line_count);
+                    }
+                    return Ok(false);
+                }
+                KeyEvent {
+                    code: KeyCode::PageUp,
+                    ..
+                } => {
+                    if let Some(state) = self.warnings_overlay_state_mut() {
+                        let delta = state.page_size.max(1) as i32;
+                        state.scroll_by(-delta, line_count);
+                    }
+                    return Ok(false);
+                }
+                KeyEvent {
+                    code: KeyCode::PageDown,
+                    ..
+                } => {
+                    if let Some(state) = self.warnings_overlay_state_mut() {
+                        let delta = state.page_size.max(1) as i32;
+                        state.scroll_by(delta, line_count);
+                    }
+                    return Ok(false);
+                }
+                KeyEvent {
+                    code: KeyCode::Home,
+                    ..
+                } => {
+                    if let Some(state) = self.warnings_overlay_state_mut() {
+                        state.scroll = 0;
+                    }
+                    return Ok(false);
+                }
+                KeyEvent {
+                    code: KeyCode::End, ..
+                } => {
+                    if let Some(state) = self.warnings_overlay_state_mut() {
+                        state.scroll = state.max_scroll(line_count);
+                    }
+                    return Ok(false);
+                }
+                // Ignore all other keys while the overlay is open.
+                _ => return Ok(false),
+            }
+        }
+
         match key {
             KeyEvent {
                 code: KeyCode::Char('q'),
@@ -76,6 +172,16 @@ impl App {
                 save_week(&self.file_path, &self.week)?;
                 self.refresh();
                 self.status = "Saved".to_string();
+            }
+            KeyEvent {
+                code: KeyCode::Char('w'),
+                modifiers: KeyModifiers::NONE,
+                ..
+            } => {
+                self.overlay_type = match self.overlay_type.take() {
+                    None => Some(Overlay::Warnings(WarningsOverlayState::new())),
+                    Some(Overlay::Warnings(_)) => None,
+                }
             }
             KeyEvent {
                 code: KeyCode::Left,
@@ -137,6 +243,80 @@ impl App {
         self.selected_day = if direction < 0 { 6 } else { 0 };
 
         Ok(())
+    }
+
+    pub fn showing_warnings(&self) -> bool {
+        matches!(self.overlay_type, Some(Overlay::Warnings(_)))
+    }
+
+    pub fn set_warnings_page_size(&mut self, page_size: usize) {
+        let line_count = self.warnings_line_count();
+        if let Some(state) = self.warnings_overlay_state_mut() {
+            state.set_page_size(page_size, line_count);
+        }
+    }
+
+    pub fn warnings_scroll(&self) -> usize {
+        self.warnings_overlay_state()
+            .map(|state| state.scroll)
+            .unwrap_or(0)
+    }
+
+    fn warnings_line_count(&self) -> usize {
+        if self.week.warnings.is_empty() {
+            1
+        } else {
+            self.week.warnings.len()
+        }
+    }
+
+    fn warnings_overlay_state(&self) -> Option<&WarningsOverlayState> {
+        match &self.overlay_type {
+            Some(Overlay::Warnings(state)) => Some(state),
+            None => None,
+        }
+    }
+
+    fn warnings_overlay_state_mut(&mut self) -> Option<&mut WarningsOverlayState> {
+        match &mut self.overlay_type {
+            Some(Overlay::Warnings(state)) => Some(state),
+            None => None,
+        }
+    }
+}
+
+impl WarningsOverlayState {
+    fn new() -> Self {
+        Self {
+            scroll: 0,
+            page_size: 5,
+        }
+    }
+
+    fn set_page_size(&mut self, page_size: usize, total_lines: usize) {
+        self.page_size = page_size.max(1);
+        self.clamp_scroll(total_lines);
+    }
+
+    fn clamp_scroll(&mut self, total_lines: usize) {
+        let max_scroll = self.max_scroll(total_lines);
+        if self.scroll > max_scroll {
+            self.scroll = max_scroll;
+        }
+    }
+
+    fn max_scroll(&self, total_lines: usize) -> usize {
+        total_lines.saturating_sub(self.page_size.max(1))
+    }
+
+    fn scroll_by(&mut self, delta: i32, total_lines: usize) {
+        if delta < 0 {
+            let amount = delta.unsigned_abs() as usize;
+            self.scroll = self.scroll.saturating_sub(amount);
+        } else {
+            self.scroll = self.scroll.saturating_add(delta as usize);
+        }
+        self.clamp_scroll(total_lines);
     }
 }
 
