@@ -30,6 +30,12 @@ fn main() {
 
 fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     let today = Local::now().date_naive();
+    if let Some(date) = cli.requested_week_number_date(today) {
+        let iso_week = date.iso_week();
+        println!("W{:02}", iso_week.week());
+        return Ok(());
+    }
+
     let week_start = week_start_for(today);
     let file_path = week_file_path(&cli.ledger_dir, today);
 

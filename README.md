@@ -18,6 +18,18 @@ cargo run -- --ledger-dir /path/to/ledger-dir
 
 If omitted, `--ledger-dir` defaults to `data/`.
 
+To print the ISO week number (`Wxx`) for today:
+
+```bash
+cargo run -- --week-number
+```
+
+To print the ISO week number for a specific date:
+
+```bash
+cargo run -- --week-number 2026-02-08
+```
+
 ## Controls
 
 - `q` / `Esc`: quit
