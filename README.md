@@ -10,6 +10,14 @@ cargo run
 
 The app loads the current week from `data/YYYY-Www.ledger` (ISO week, Monday start).
 
+To load ledgers from another directory:
+
+```bash
+cargo run -- --ledger-dir /path/to/ledger-dir
+```
+
+If omitted, `--ledger-dir` defaults to `data/`.
+
 ## Controls
 
 - `q` / `Esc`: quit

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use chrono::{Datelike, Duration, NaiveDate};
 
@@ -130,6 +130,10 @@ pub fn week_start_for(date: NaiveDate) -> NaiveDate {
 pub fn week_file_name(date: NaiveDate) -> String {
     let iso = date.iso_week();
     format!("{:04}-W{:02}.ledger", iso.year(), iso.week())
+}
+
+pub fn week_file_path(ledger_dir: &Path, date: NaiveDate) -> PathBuf {
+    ledger_dir.join(week_file_name(date))
 }
 
 pub fn parse_ledger(content: &str, default_week_start: NaiveDate) -> WeekData {

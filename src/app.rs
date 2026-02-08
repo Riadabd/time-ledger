@@ -6,7 +6,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::ledger::{
     Totals, WeekData, apply_computed_times, compute_totals, load_week, load_week_if_exists,
-    save_week, week_dates, week_file_name, week_start_for,
+    save_week, week_dates, week_file_path, week_start_for,
 };
 
 #[derive(Debug, Clone)]
@@ -22,6 +22,7 @@ enum Overlay {
 pub struct App {
     pub week: WeekData,
     pub file_path: PathBuf,
+    ledger_dir: PathBuf,
     pub tasks: Vec<TaskDisplay>,
     pub selected_day: usize,
     pub selected_task: usize,
@@ -36,13 +37,14 @@ struct WarningsOverlayState {
 }
 
 impl App {
-    pub fn new(week: WeekData, file_path: PathBuf) -> Self {
+    pub fn new(week: WeekData, file_path: PathBuf, ledger_dir: PathBuf) -> Self {
         let totals = compute_totals(&week);
         let tasks = build_tasks(&totals);
         let status = format!("Warnings: {}", week.warnings.len());
         Self {
             week,
             file_path,
+            ledger_dir,
             tasks,
             selected_day: 0,
             selected_task: 0,
@@ -225,8 +227,7 @@ impl App {
     fn shift_week(&mut self, direction: i64) -> Result<(), Box<dyn Error>> {
         let week_start = week_start_for(Local::now().date_naive());
         let candidate_week = self.week.week_start + Duration::days(7 * direction);
-        let file_name = week_file_name(candidate_week);
-        let file_path = PathBuf::from("data").join(file_name);
+        let file_path = week_file_path(&self.ledger_dir, candidate_week);
 
         let week = if candidate_week == week_start {
             load_week(&file_path, candidate_week)?

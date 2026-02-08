@@ -1,13 +1,14 @@
 mod app;
+mod cli;
 mod ledger;
 mod time_amount;
 mod ui;
 
 use std::io;
-use std::path::PathBuf;
 use std::time::Duration as StdDuration;
 
 use chrono::{Datelike, Local};
+use clap::Parser;
 use crossterm::ExecutableCommand;
 use crossterm::event::{self, Event};
 use crossterm::terminal::{
@@ -17,26 +18,27 @@ use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 
 use crate::app::App;
-use crate::ledger::{empty_week, load_week, week_file_name, week_start_for};
+use crate::cli::Cli;
+use crate::ledger::{empty_week, load_week, week_file_path, week_start_for};
 
 fn main() {
-    if let Err(err) = run() {
-        eprintln!("error: {err:?}");
+    let cli = Cli::parse();
+    if let Err(err) = run(cli) {
+        eprintln!("error: {err}");
     }
 }
 
-fn run() -> Result<(), Box<dyn std::error::Error>> {
+fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     let today = Local::now().date_naive();
     let week_start = week_start_for(today);
-    let file_name = week_file_name(today);
-    let file_path = PathBuf::from("data").join(file_name);
+    let file_path = week_file_path(&cli.ledger_dir, today);
 
     let mut week = load_week(&file_path, week_start)?;
     if week.days.is_empty() {
         week = empty_week(week.week_start);
     }
 
-    let mut app = App::new(week, file_path);
+    let mut app = App::new(week, file_path, cli.ledger_dir);
     app.selected_day = today.weekday().num_days_from_monday() as usize;
 
     enable_raw_mode()?;
