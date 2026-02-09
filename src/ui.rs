@@ -170,34 +170,37 @@ fn build_day_lines(day: &Day, lines: &mut Vec<Line>) {
 
     for entry in &day.entries {
         let resolved = resolve_entry(entry);
-        let time_text = match (
-            entry.time,
-            resolved.sub_total_minutes,
-            resolved.sub_complete,
-        ) {
-            (Some(time), _, _) => time.format(),
-            (None, Some(minutes), true) => format!("{} (computed)", format_minutes(minutes)),
-            (None, _, _) => "—".to_string(),
-        };
-
-        let check = if entry.checked { "[x]" } else { "[ ]" };
-        let mut spans = vec![
-            Span::raw(check),
-            Span::raw(" "),
-            Span::raw(entry.name.clone()),
-            Span::raw(" @"),
-            Span::raw(time_text),
-        ];
+        let mut line = format!("- {}", entry.name.trim());
+        if let Some(time) = entry.time {
+            line.push_str(" @");
+            line.push_str(&time.format());
+        }
+        if entry.checked {
+            line.push_str(" [x]");
+        }
+        lines.push(Line::from(line));
 
         if resolved.mismatch {
-            spans.push(Span::raw(" "));
-            spans.push(Span::styled("mismatch", Style::default().fg(Color::Red)));
+            if let (Some(parent), Some(sub_total)) = (entry.time, resolved.sub_total_minutes) {
+                lines.push(Line::from(vec![
+                    Span::raw("  "),
+                    Span::styled("mismatch:", Style::default().fg(Color::Red)),
+                    Span::raw(format!(
+                        " parent @{} vs sub-items @{}",
+                        parent.format(),
+                        format_minutes(sub_total)
+                    )),
+                ]));
+            } else {
+                lines.push(Line::from(vec![
+                    Span::raw("  "),
+                    Span::styled("mismatch", Style::default().fg(Color::Red)),
+                ]));
+            }
         }
 
-        lines.push(Line::from(spans));
-
         for sub in &entry.sub_items {
-            let mut sub_line = format!("  - {}", sub.name);
+            let mut sub_line = format!("  - {}", sub.name.trim());
             if let Some(time) = sub.time {
                 sub_line.push_str(" @");
                 sub_line.push_str(&time.format());
