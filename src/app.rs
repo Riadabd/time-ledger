@@ -2,11 +2,14 @@ use std::error::Error;
 use std::path::PathBuf;
 
 use chrono::{Duration, Local, NaiveDate};
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::KeyEvent;
+
+mod main_screen;
+mod warnings_screen;
 
 use crate::ledger::{
-    Totals, WeekData, apply_computed_times, compute_totals, load_week, load_week_if_exists,
-    save_week, week_dates, week_file_path, week_start_for,
+    Totals, WeekData, compute_totals, load_week, load_week_if_exists, week_dates, week_file_path,
+    week_start_for,
 };
 
 #[derive(Debug, Clone)]
@@ -15,8 +18,15 @@ pub struct TaskDisplay {
     pub name: String,
 }
 
-enum Overlay {
+enum Screen {
+    Main,
     Warnings(WarningsOverlayState),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ScreenKind {
+    Main,
+    Warnings,
 }
 
 pub struct App {
@@ -28,7 +38,7 @@ pub struct App {
     pub selected_task: usize,
     pub totals: Totals,
     pub status: String,
-    overlay_type: Option<Overlay>,
+    screen: Screen,
 }
 
 struct WarningsOverlayState {
@@ -50,7 +60,7 @@ impl App {
             selected_task: 0,
             totals,
             status,
-            overlay_type: None,
+            screen: Screen::Main,
         }
     }
 
@@ -76,152 +86,17 @@ impl App {
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> Result<bool, Box<dyn Error>> {
-        if self.showing_warnings() {
-            let line_count = self.warnings_line_count();
-            // Modal overlay: consume navigation keys so the main UI doesn't move underneath.
-            match key {
-                KeyEvent {
-                    code: KeyCode::Char('w'),
-                    modifiers: KeyModifiers::NONE,
-                    ..
-                } => {
-                    self.overlay_type = None;
-                    return Ok(false);
-                }
-                KeyEvent {
-                    code: KeyCode::Char('q'),
-                    ..
-                }
-                | KeyEvent {
-                    code: KeyCode::Esc, ..
-                } => {
-                    self.overlay_type = None;
-                    return Ok(false);
-                }
-                KeyEvent {
-                    code: KeyCode::Up, ..
-                } => {
-                    if let Some(state) = self.warnings_overlay_state_mut() {
-                        state.scroll_by(-1, line_count);
-                    }
-                    return Ok(false);
-                }
-                KeyEvent {
-                    code: KeyCode::Down,
-                    ..
-                } => {
-                    if let Some(state) = self.warnings_overlay_state_mut() {
-                        state.scroll_by(1, line_count);
-                    }
-                    return Ok(false);
-                }
-                KeyEvent {
-                    code: KeyCode::PageUp,
-                    ..
-                } => {
-                    if let Some(state) = self.warnings_overlay_state_mut() {
-                        let delta = state.page_size.max(1) as i32;
-                        state.scroll_by(-delta, line_count);
-                    }
-                    return Ok(false);
-                }
-                KeyEvent {
-                    code: KeyCode::PageDown,
-                    ..
-                } => {
-                    if let Some(state) = self.warnings_overlay_state_mut() {
-                        let delta = state.page_size.max(1) as i32;
-                        state.scroll_by(delta, line_count);
-                    }
-                    return Ok(false);
-                }
-                KeyEvent {
-                    code: KeyCode::Home,
-                    ..
-                } => {
-                    if let Some(state) = self.warnings_overlay_state_mut() {
-                        state.scroll = 0;
-                    }
-                    return Ok(false);
-                }
-                KeyEvent {
-                    code: KeyCode::End, ..
-                } => {
-                    if let Some(state) = self.warnings_overlay_state_mut() {
-                        state.scroll = state.max_scroll(line_count);
-                    }
-                    return Ok(false);
-                }
-                // Ignore all other keys while the overlay is open.
-                _ => return Ok(false),
-            }
+        match self.active_screen() {
+            ScreenKind::Main => main_screen::handle_key(self, key),
+            ScreenKind::Warnings => warnings_screen::handle_key(self, key),
         }
+    }
 
-        match key {
-            KeyEvent {
-                code: KeyCode::Char('q'),
-                ..
-            }
-            | KeyEvent {
-                code: KeyCode::Esc, ..
-            } => return Ok(true),
-            KeyEvent {
-                code: KeyCode::Char('s'),
-                modifiers: KeyModifiers::NONE,
-                ..
-            } => {
-                apply_computed_times(&mut self.week)?;
-                save_week(&self.file_path, &self.week)?;
-                self.refresh();
-                self.status = "Saved".to_string();
-            }
-            KeyEvent {
-                code: KeyCode::Char('w'),
-                modifiers: KeyModifiers::NONE,
-                ..
-            } => {
-                self.overlay_type = match self.overlay_type.take() {
-                    None => Some(Overlay::Warnings(WarningsOverlayState::new())),
-                    Some(Overlay::Warnings(_)) => None,
-                }
-            }
-            KeyEvent {
-                code: KeyCode::Left,
-                ..
-            } => {
-                if self.selected_day == 0 {
-                    self.shift_week(-1)?;
-                } else {
-                    self.selected_day = self.selected_day.saturating_sub(1);
-                }
-            }
-            KeyEvent {
-                code: KeyCode::Right,
-                ..
-            } => {
-                if self.selected_day == 6 {
-                    self.shift_week(1)?;
-                } else {
-                    self.selected_day = (self.selected_day + 1).min(6);
-                }
-            }
-            KeyEvent {
-                code: KeyCode::Up, ..
-            } => {
-                self.selected_task = self.selected_task.saturating_sub(1);
-            }
-            KeyEvent {
-                code: KeyCode::Down,
-                ..
-            } => {
-                if !self.tasks.is_empty() {
-                    self.selected_task = (self.selected_task + 1).min(self.tasks.len() - 1);
-                }
-            }
-            _ => {}
+    fn active_screen(&self) -> ScreenKind {
+        match &self.screen {
+            Screen::Main => ScreenKind::Main,
+            Screen::Warnings(_) => ScreenKind::Warnings,
         }
-
-        Ok(false)
     }
 
     fn shift_week(&mut self, direction: i64) -> Result<(), Box<dyn Error>> {
@@ -247,7 +122,7 @@ impl App {
     }
 
     pub fn showing_warnings(&self) -> bool {
-        matches!(self.overlay_type, Some(Overlay::Warnings(_)))
+        matches!(self.screen, Screen::Warnings(_))
     }
 
     pub fn set_warnings_page_size(&mut self, page_size: usize) {
@@ -272,16 +147,16 @@ impl App {
     }
 
     fn warnings_overlay_state(&self) -> Option<&WarningsOverlayState> {
-        match &self.overlay_type {
-            Some(Overlay::Warnings(state)) => Some(state),
-            None => None,
+        match &self.screen {
+            Screen::Warnings(state) => Some(state),
+            Screen::Main => None,
         }
     }
 
     fn warnings_overlay_state_mut(&mut self) -> Option<&mut WarningsOverlayState> {
-        match &mut self.overlay_type {
-            Some(Overlay::Warnings(state)) => Some(state),
-            None => None,
+        match &mut self.screen {
+            Screen::Warnings(state) => Some(state),
+            Screen::Main => None,
         }
     }
 }
