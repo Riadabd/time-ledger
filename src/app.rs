@@ -38,7 +38,7 @@ pub struct App {
     pub selected_task: usize,
     pub totals: Totals,
     pub status: String,
-    screen: Screen,
+    screen_stack: Vec<Screen>,
 }
 
 struct WarningsOverlayState {
@@ -60,7 +60,7 @@ impl App {
             selected_task: 0,
             totals,
             status,
-            screen: Screen::Main,
+            screen_stack: vec![Screen::Main],
         }
     }
 
@@ -93,9 +93,20 @@ impl App {
     }
 
     fn active_screen(&self) -> ScreenKind {
-        match &self.screen {
-            Screen::Main => ScreenKind::Main,
-            Screen::Warnings(_) => ScreenKind::Warnings,
+        match self.screen_stack.last() {
+            Some(Screen::Main) => ScreenKind::Main,
+            Some(Screen::Warnings(_)) => ScreenKind::Warnings,
+            None => ScreenKind::Main,
+        }
+    }
+
+    fn push_screen(&mut self, screen: Screen) {
+        self.screen_stack.push(screen);
+    }
+
+    fn pop_screen(&mut self) {
+        if self.screen_stack.len() > 1 {
+            self.screen_stack.pop();
         }
     }
 
@@ -122,7 +133,7 @@ impl App {
     }
 
     pub fn showing_warnings(&self) -> bool {
-        matches!(self.screen, Screen::Warnings(_))
+        matches!(self.screen_stack.last(), Some(Screen::Warnings(_)))
     }
 
     pub fn set_warnings_page_size(&mut self, page_size: usize) {
@@ -147,16 +158,16 @@ impl App {
     }
 
     fn warnings_overlay_state(&self) -> Option<&WarningsOverlayState> {
-        match &self.screen {
-            Screen::Warnings(state) => Some(state),
-            Screen::Main => None,
+        match self.screen_stack.last() {
+            Some(Screen::Warnings(state)) => Some(state),
+            Some(Screen::Main) | None => None,
         }
     }
 
     fn warnings_overlay_state_mut(&mut self) -> Option<&mut WarningsOverlayState> {
-        match &mut self.screen {
-            Screen::Warnings(state) => Some(state),
-            Screen::Main => None,
+        match self.screen_stack.last_mut() {
+            Some(Screen::Warnings(state)) => Some(state),
+            Some(Screen::Main) | None => None,
         }
     }
 }

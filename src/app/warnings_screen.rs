@@ -2,7 +2,7 @@ use std::error::Error;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use super::{App, Screen};
+use super::App;
 
 pub(super) fn handle_key(app: &mut App, key: KeyEvent) -> Result<bool, Box<dyn Error>> {
     let line_count = app.warnings_line_count();
@@ -13,7 +13,7 @@ pub(super) fn handle_key(app: &mut App, key: KeyEvent) -> Result<bool, Box<dyn E
             modifiers: KeyModifiers::NONE,
             ..
         } => {
-            app.screen = Screen::Main;
+            app.pop_screen();
         }
         KeyEvent {
             code: KeyCode::Char('q'),
@@ -22,7 +22,7 @@ pub(super) fn handle_key(app: &mut App, key: KeyEvent) -> Result<bool, Box<dyn E
         | KeyEvent {
             code: KeyCode::Esc, ..
         } => {
-            app.screen = Screen::Main;
+            app.pop_screen();
         }
         KeyEvent {
             code: KeyCode::Up, ..

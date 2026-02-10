@@ -29,7 +29,7 @@ pub(super) fn handle_key(app: &mut App, key: KeyEvent) -> Result<bool, Box<dyn E
             modifiers: KeyModifiers::NONE,
             ..
         } => {
-            app.screen = Screen::Warnings(WarningsOverlayState::new());
+            app.push_screen(Screen::Warnings(WarningsOverlayState::new()));
         }
         KeyEvent {
             code: KeyCode::Left,
