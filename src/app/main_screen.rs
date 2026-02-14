@@ -2,7 +2,8 @@ use std::error::Error;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use super::{App, Screen, WarningsOverlayState};
+use super::scroll_state::ScrollState;
+use super::{App, Screen};
 use crate::ledger::{apply_computed_times, save_week};
 
 pub(super) fn handle_key(app: &mut App, key: KeyEvent) -> Result<bool, Box<dyn Error>> {
@@ -29,7 +30,10 @@ pub(super) fn handle_key(app: &mut App, key: KeyEvent) -> Result<bool, Box<dyn E
             modifiers: KeyModifiers::NONE,
             ..
         } => {
-            app.push_screen(Screen::Warnings(WarningsOverlayState::new()));
+            app.push_screen(Screen::Warnings(ScrollState {
+                offset: 0,
+                page_size: 5,
+            }));
         }
         KeyEvent {
             code: KeyCode::Left,

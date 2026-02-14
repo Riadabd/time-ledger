@@ -44,8 +44,7 @@ pub(super) fn handle_key(app: &mut App, key: KeyEvent) -> Result<bool, Box<dyn E
             ..
         } => {
             if let Some(state) = app.warnings_overlay_state_mut() {
-                let delta = state.page_size.max(1) as i32;
-                state.scroll_by(-delta, line_count);
+                state.page_up(line_count);
             }
         }
         KeyEvent {
@@ -53,8 +52,7 @@ pub(super) fn handle_key(app: &mut App, key: KeyEvent) -> Result<bool, Box<dyn E
             ..
         } => {
             if let Some(state) = app.warnings_overlay_state_mut() {
-                let delta = state.page_size.max(1) as i32;
-                state.scroll_by(delta, line_count);
+                state.page_down(line_count);
             }
         }
         KeyEvent {
@@ -62,14 +60,14 @@ pub(super) fn handle_key(app: &mut App, key: KeyEvent) -> Result<bool, Box<dyn E
             ..
         } => {
             if let Some(state) = app.warnings_overlay_state_mut() {
-                state.scroll = 0;
+                state.home();
             }
         }
         KeyEvent {
             code: KeyCode::End, ..
         } => {
             if let Some(state) = app.warnings_overlay_state_mut() {
-                state.scroll = state.max_scroll(line_count);
+                state.end(line_count);
             }
         }
         // Ignore all other keys while the overlay is open.

@@ -5,8 +5,10 @@ use chrono::{Duration, Local, NaiveDate};
 use crossterm::event::KeyEvent;
 
 mod main_screen;
+mod scroll_state;
 mod warnings_screen;
 
+use crate::app::scroll_state::ScrollState;
 use crate::ledger::{
     Totals, WeekData, compute_totals, load_week, load_week_if_exists, week_dates, week_file_path,
     week_start_for,
@@ -20,7 +22,7 @@ pub struct TaskDisplay {
 
 enum Screen {
     Main,
-    Warnings(WarningsOverlayState),
+    Warnings(ScrollState),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -39,11 +41,6 @@ pub struct App {
     pub totals: Totals,
     pub status: String,
     screen_stack: Vec<Screen>,
-}
-
-struct WarningsOverlayState {
-    scroll: usize,
-    page_size: usize,
 }
 
 impl App {
@@ -73,7 +70,7 @@ impl App {
         self.status = format!("Warnings: {}", self.week.warnings.len());
         let line_count = self.warnings_line_count();
         if let Some(state) = self.warnings_overlay_state_mut() {
-            state.clamp_scroll(line_count);
+            state.clamp(line_count);
         }
     }
 
@@ -145,7 +142,7 @@ impl App {
 
     pub fn warnings_scroll(&self) -> usize {
         self.warnings_overlay_state()
-            .map(|state| state.scroll)
+            .map(|state| state.offset)
             .unwrap_or(0)
     }
 
@@ -157,53 +154,18 @@ impl App {
         }
     }
 
-    fn warnings_overlay_state(&self) -> Option<&WarningsOverlayState> {
+    fn warnings_overlay_state(&self) -> Option<&ScrollState> {
         match self.screen_stack.last() {
             Some(Screen::Warnings(state)) => Some(state),
             Some(Screen::Main) | None => None,
         }
     }
 
-    fn warnings_overlay_state_mut(&mut self) -> Option<&mut WarningsOverlayState> {
+    fn warnings_overlay_state_mut(&mut self) -> Option<&mut ScrollState> {
         match self.screen_stack.last_mut() {
             Some(Screen::Warnings(state)) => Some(state),
             Some(Screen::Main) | None => None,
         }
-    }
-}
-
-impl WarningsOverlayState {
-    fn new() -> Self {
-        Self {
-            scroll: 0,
-            page_size: 5,
-        }
-    }
-
-    fn set_page_size(&mut self, page_size: usize, total_lines: usize) {
-        self.page_size = page_size.max(1);
-        self.clamp_scroll(total_lines);
-    }
-
-    fn clamp_scroll(&mut self, total_lines: usize) {
-        let max_scroll = self.max_scroll(total_lines);
-        if self.scroll > max_scroll {
-            self.scroll = max_scroll;
-        }
-    }
-
-    fn max_scroll(&self, total_lines: usize) -> usize {
-        total_lines.saturating_sub(self.page_size.max(1))
-    }
-
-    fn scroll_by(&mut self, delta: i32, total_lines: usize) {
-        if delta < 0 {
-            let amount = delta.unsigned_abs() as usize;
-            self.scroll = self.scroll.saturating_sub(amount);
-        } else {
-            self.scroll = self.scroll.saturating_add(delta as usize);
-        }
-        self.clamp_scroll(total_lines);
     }
 }
 
