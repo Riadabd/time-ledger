@@ -417,6 +417,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "edit_core"
+version = "0.1.0"
+source = "git+https://github.com/Riadabd/edit_core?tag=v0.1.0#2be1da86fd486a2b450ab29b7693e1808b80e936"
+
+[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1451,6 +1456,7 @@ dependencies = [
  "chrono",
  "clap",
  "crossterm",
+ "edit_core",
  "ratatui",
 ]
 

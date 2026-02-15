@@ -4,10 +4,12 @@ use std::path::PathBuf;
 use chrono::{Duration, Local, NaiveDate};
 use crossterm::event::KeyEvent;
 
+mod day_pane;
 mod main_screen;
 mod scroll_state;
 mod warnings_screen;
 
+use crate::app::day_pane::{DayPane, DayPaneKind};
 use crate::app::scroll_state::ScrollState;
 use crate::ledger::{
     Totals, WeekData, compute_totals, load_week, load_week_if_exists, week_dates, week_file_path,
@@ -40,6 +42,7 @@ pub struct App {
     pub selected_task: usize,
     pub totals: Totals,
     pub status: String,
+    day_pane: DayPane,
     screen_stack: Vec<Screen>,
 }
 
@@ -57,6 +60,7 @@ impl App {
             selected_task: 0,
             totals,
             status,
+            day_pane: DayPane::View,
             screen_stack: vec![Screen::Main],
         }
     }
@@ -72,6 +76,7 @@ impl App {
         if let Some(state) = self.warnings_overlay_state_mut() {
             state.clamp(line_count);
         }
+        day_pane::clamp_diagnostics_scroll(self);
     }
 
     pub fn selected_date(&self) -> NaiveDate {
@@ -131,6 +136,46 @@ impl App {
 
     pub fn showing_warnings(&self) -> bool {
         matches!(self.screen_stack.last(), Some(Screen::Warnings(_)))
+    }
+
+    pub fn day_pane_kind(&self) -> DayPaneKind {
+        day_pane::kind(&self.day_pane)
+    }
+
+    pub fn day_pane_is_editing(&self) -> bool {
+        self.day_pane_kind() == DayPaneKind::Edit
+    }
+
+    pub fn enter_day_edit_mode(&mut self) {
+        day_pane::enter_edit_mode(self);
+    }
+
+    pub fn handle_day_edit_key(&mut self, key: KeyEvent) -> Result<(), Box<dyn Error>> {
+        day_pane::handle_edit_key(self, key)
+    }
+
+    pub fn day_editor_visible_lines(&self) -> Option<Vec<String>> {
+        day_pane::editor_visible_lines(self)
+    }
+
+    pub fn day_editor_cursor_screen_pos(&self) -> Option<(usize, usize)> {
+        day_pane::editor_cursor_screen_pos(self)
+    }
+
+    pub fn set_day_editor_viewport(&mut self, height: usize, width: usize) {
+        day_pane::set_editor_viewport(self, height, width);
+    }
+
+    pub fn day_diagnostics_lines(&self) -> Option<&[String]> {
+        day_pane::diagnostics_lines(self)
+    }
+
+    pub fn day_diagnostics_scroll(&self) -> usize {
+        day_pane::diagnostics_scroll(self).unwrap_or(0)
+    }
+
+    pub fn set_day_diagnostics_page_size(&mut self, page_size: usize) {
+        day_pane::set_diagnostics_page_size(self, page_size);
     }
 
     pub fn set_warnings_page_size(&mut self, page_size: usize) {

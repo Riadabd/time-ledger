@@ -321,6 +321,65 @@ pub fn render_week(week: &WeekData) -> Result<String, LedgerError> {
     Ok(lines.join("\n"))
 }
 
+pub fn render_day(day: &Day) -> String {
+    let mut lines: Vec<String> = Vec::new();
+    for entry in &day.entries {
+        lines.push(render_entry_line(entry));
+        for sub in &entry.sub_items {
+            lines.push(render_sub_item_line(sub));
+        }
+    }
+    lines.join("\n")
+}
+
+pub fn parse_day(content: &str) -> (Day, Vec<String>) {
+    let mut day = Day {
+        entries: Vec::new(),
+    };
+    let mut warnings: Vec<String> = Vec::new();
+    let mut last_entry_index: Option<usize> = None;
+
+    for (line_idx, raw_line) in content.lines().enumerate() {
+        let line_no = line_idx + 1;
+        let line = raw_line.trim_end();
+        if line.is_empty() || line.starts_with(";;") {
+            continue;
+        }
+
+        let Some(parsed) = parse_entry_line(line) else {
+            warnings.push(format!("Unrecognized line {line_no}: {line}"));
+            continue;
+        };
+
+        if let Some(error) = parsed.time_error {
+            warnings.push(format!("Line {line_no}: {error}"));
+        }
+
+        if parsed.is_sub_item {
+            let Some(parent_index) = last_entry_index else {
+                warnings.push(format!("Line {line_no}: sub-item without parent"));
+                continue;
+            };
+            if let Some(parent) = day.entries.get_mut(parent_index) {
+                parent.sub_items.push(SubItem {
+                    name: parsed.name,
+                    time: parsed.time,
+                });
+            }
+        } else {
+            day.entries.push(Entry {
+                name: parsed.name,
+                time: parsed.time,
+                checked: parsed.checked,
+                sub_items: Vec::new(),
+            });
+            last_entry_index = Some(day.entries.len().saturating_sub(1));
+        }
+    }
+
+    (day, warnings)
+}
+
 fn render_entry_line(entry: &Entry) -> String {
     let mut line = format!("- {}", entry.name.trim());
     if let Some(time) = entry.time {
@@ -472,4 +531,43 @@ pub fn empty_week(week_start: NaiveDate) -> WeekData {
         week.day_mut(date);
     }
     week
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ledger::{parse_day, render_day};
+
+    #[test]
+    fn parse_day_supports_entries_and_sub_items() {
+        let content = "- Parent @1h [x]\n  - Child @30m\n- Solo";
+        let (day, warnings) = parse_day(content);
+
+        assert!(warnings.is_empty());
+        assert_eq!(day.entries.len(), 2);
+        assert_eq!(day.entries[0].name, "Parent");
+        assert!(day.entries[0].checked);
+        assert_eq!(day.entries[0].sub_items.len(), 1);
+        assert_eq!(day.entries[0].sub_items[0].name, "Child");
+        assert_eq!(day.entries[1].name, "Solo");
+    }
+
+    #[test]
+    fn parse_day_reports_unrecognized_and_orphan_sub_items() {
+        let content = "random text\n  - orphan";
+        let (_day, warnings) = parse_day(content);
+
+        assert_eq!(warnings.len(), 2);
+        assert!(warnings[0].contains("Unrecognized line 1"));
+        assert!(warnings[1].contains("sub-item without parent"));
+    }
+
+    #[test]
+    fn render_day_round_trips_canonical_lines() {
+        let content = "- Build @1h\n  - review @30m\n- Test [x]";
+        let (day, warnings) = parse_day(content);
+        assert!(warnings.is_empty());
+
+        let rendered = render_day(&day);
+        assert_eq!(rendered, content);
+    }
 }

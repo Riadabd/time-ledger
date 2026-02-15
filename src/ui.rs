@@ -19,7 +19,11 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
         .split(root[0]);
 
     draw_week_table(frame, app, main[0]);
-    draw_day_detail(frame, app, main[1]);
+    if app.day_pane_is_editing() {
+        draw_day_edit(frame, app, main[1]);
+    } else {
+        draw_day_detail(frame, app, main[1]);
+    }
 
     let footer = build_footer(app);
     frame.render_widget(footer, root[1]);
@@ -32,6 +36,8 @@ pub fn draw(frame: &mut Frame<'_>, app: &mut App) {
 fn build_footer(app: &App) -> Paragraph<'_> {
     let line = if app.showing_warnings() {
         warnings_footer_line(app)
+    } else if app.day_pane_is_editing() {
+        edit_footer_line(app)
     } else {
         main_footer_line(app)
     };
@@ -50,8 +56,26 @@ fn main_footer_line(app: &App) -> Line<'_> {
         Span::raw(" task  "),
         Span::styled("s", Style::default().add_modifier(Modifier::BOLD)),
         Span::raw(" save  "),
+        Span::styled("e", Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw(" edit day  "),
         Span::styled("w", Style::default().add_modifier(Modifier::BOLD)),
         Span::raw(" show warnings  "),
+        Span::raw(&app.status),
+    ])
+}
+
+fn edit_footer_line(app: &App) -> Line<'_> {
+    Line::from(vec![
+        Span::styled("Esc", Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw(" leave edit  "),
+        Span::styled("Ctrl+s", Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw(" save  "),
+        Span::styled("←/→/↑/↓", Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw(" move cursor  "),
+        Span::styled("PgUp/PgDn", Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw(" diagnostics scroll  "),
+        Span::styled("Home/End", Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw(" diagnostics jump  "),
         Span::raw(&app.status),
     ])
 }
@@ -160,6 +184,66 @@ fn draw_day_detail(frame: &mut Frame<'_>, app: &App, area: Rect) {
         .wrap(Wrap { trim: false });
 
     frame.render_widget(paragraph, area);
+}
+
+fn draw_day_edit(frame: &mut Frame<'_>, app: &mut App, area: Rect) {
+    let date = app.selected_date();
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(65), Constraint::Percentage(35)])
+        .split(area);
+
+    let editor_area = layout[0];
+    let diagnostics_area = layout[1];
+
+    let editor_height = editor_area.height.saturating_sub(2) as usize;
+    let editor_width = editor_area.width.saturating_sub(2) as usize;
+    app.set_day_editor_viewport(editor_height.max(1), editor_width.max(1));
+
+    let editor_lines = app
+        .day_editor_visible_lines()
+        .unwrap_or_default()
+        .into_iter()
+        .map(Line::from)
+        .collect::<Vec<_>>();
+    let editor_title = format!("Edit {} {}", date.format("%A"), date.format("%Y-%m-%d"));
+    let editor_paragraph = Paragraph::new(editor_lines)
+        .block(Block::default().borders(Borders::ALL).title(editor_title))
+        .alignment(Alignment::Left);
+    frame.render_widget(editor_paragraph, editor_area);
+
+    if editor_area.width > 2
+        && editor_area.height > 2
+        && let Some((row, col)) = app.day_editor_cursor_screen_pos()
+    {
+        let visible_row = row
+            .min(editor_height.saturating_sub(1))
+            .min(u16::MAX as usize) as u16;
+        let visible_col = col
+            .min(editor_width.saturating_sub(1))
+            .min(u16::MAX as usize) as u16;
+        let x = editor_area.x.saturating_add(1).saturating_add(visible_col);
+        let y = editor_area.y.saturating_add(1).saturating_add(visible_row);
+        frame.set_cursor_position((x, y));
+    }
+
+    let diagnostics_lines = app.day_diagnostics_lines().unwrap_or(&[]);
+    let mut diagnostic_lines: Vec<Line> =
+        diagnostics_lines.iter().cloned().map(Line::from).collect();
+    if diagnostic_lines.is_empty() {
+        diagnostic_lines.push(Line::from("No issues"));
+    }
+
+    let diagnostics_height = diagnostics_area.height.saturating_sub(2) as usize;
+    app.set_day_diagnostics_page_size(diagnostics_height.max(1));
+    let diagnostics_scroll = app.day_diagnostics_scroll().min(u16::MAX as usize) as u16;
+
+    let diagnostics_paragraph = Paragraph::new(diagnostic_lines)
+        .block(Block::default().borders(Borders::ALL).title("Diagnostics"))
+        .alignment(Alignment::Left)
+        .wrap(Wrap { trim: false })
+        .scroll((diagnostics_scroll, 0));
+    frame.render_widget(diagnostics_paragraph, diagnostics_area);
 }
 
 fn build_day_lines(day: &Day, lines: &mut Vec<Line>) {

@@ -2,11 +2,22 @@ use std::error::Error;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
+use super::day_pane::DayPaneKind;
 use super::scroll_state::ScrollState;
 use super::{App, Screen};
 use crate::ledger::{apply_computed_times, save_week};
 
 pub(super) fn handle_key(app: &mut App, key: KeyEvent) -> Result<bool, Box<dyn Error>> {
+    match app.day_pane_kind() {
+        DayPaneKind::View => handle_view_key(app, key),
+        DayPaneKind::Edit => {
+            app.handle_day_edit_key(key)?;
+            Ok(false)
+        }
+    }
+}
+
+fn handle_view_key(app: &mut App, key: KeyEvent) -> Result<bool, Box<dyn Error>> {
     match key {
         KeyEvent {
             code: KeyCode::Char('q'),
@@ -34,6 +45,13 @@ pub(super) fn handle_key(app: &mut App, key: KeyEvent) -> Result<bool, Box<dyn E
                 offset: 0,
                 page_size: 5,
             }));
+        }
+        KeyEvent {
+            code: KeyCode::Char('e'),
+            modifiers: KeyModifiers::NONE,
+            ..
+        } => {
+            app.enter_day_edit_mode();
         }
         KeyEvent {
             code: KeyCode::Left,
