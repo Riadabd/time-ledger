@@ -419,7 +419,7 @@ dependencies = [
 [[package]]
 name = "edit_core"
 version = "0.1.0"
-source = "git+https://github.com/Riadabd/edit_core?tag=v0.1.0#2be1da86fd486a2b450ab29b7693e1808b80e936"
+source = "git+https://github.com/Riadabd/edit_core?tag=v0.2.0#5150f96034f4e4b879cf7f7fe339929693240efa"
 
 [[package]]
 name = "either"

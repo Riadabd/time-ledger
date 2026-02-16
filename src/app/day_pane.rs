@@ -283,6 +283,16 @@ fn key_to_editor_action(key: KeyEvent) -> Option<Action> {
     match key {
         KeyEvent {
             code: KeyCode::Left,
+            modifiers,
+            ..
+        } if is_word_jump_modifier(modifiers) => Some(Action::MoveWordLeft),
+        KeyEvent {
+            code: KeyCode::Right,
+            modifiers,
+            ..
+        } if is_word_jump_modifier(modifiers) => Some(Action::MoveWordRight),
+        KeyEvent {
+            code: KeyCode::Left,
             ..
         } => Some(Action::MoveLeft),
         KeyEvent {
@@ -322,6 +332,16 @@ fn key_to_editor_action(key: KeyEvent) -> Option<Action> {
     }
 }
 
+#[cfg(target_os = "macos")]
+fn is_word_jump_modifier(modifiers: KeyModifiers) -> bool {
+    modifiers == KeyModifiers::ALT
+}
+
+#[cfg(not(target_os = "macos"))]
+fn is_word_jump_modifier(modifiers: KeyModifiers) -> bool {
+    modifiers == KeyModifiers::CONTROL
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -348,6 +368,38 @@ mod tests {
         let event = KeyEvent::new(KeyCode::Char('s'), KeyModifiers::CONTROL);
         let action = key_to_editor_action(event);
         assert!(action.is_none());
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn option_arrow_maps_to_word_jump_actions() {
+        let left = KeyEvent::new(KeyCode::Left, KeyModifiers::ALT);
+        let right = KeyEvent::new(KeyCode::Right, KeyModifiers::ALT);
+
+        assert_eq!(
+            key_to_editor_action(left),
+            Some(edit_core::Action::MoveWordLeft)
+        );
+        assert_eq!(
+            key_to_editor_action(right),
+            Some(edit_core::Action::MoveWordRight)
+        );
+    }
+
+    #[test]
+    #[cfg(not(target_os = "macos"))]
+    fn ctrl_arrow_maps_to_word_jump_actions() {
+        let left = KeyEvent::new(KeyCode::Left, KeyModifiers::CONTROL);
+        let right = KeyEvent::new(KeyCode::Right, KeyModifiers::CONTROL);
+
+        assert_eq!(
+            key_to_editor_action(left),
+            Some(edit_core::Action::MoveWordLeft)
+        );
+        assert_eq!(
+            key_to_editor_action(right),
+            Some(edit_core::Action::MoveWordRight)
+        );
     }
 
     #[test]
