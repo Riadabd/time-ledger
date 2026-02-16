@@ -32,10 +32,34 @@ cargo run -- --week-number 2026-02-08
 
 ## Controls
 
+### Main screen
+
 - `q` / `Esc`: quit
 - `←` / `→`: move day selection
 - `↑` / `↓`: move task selection
 - `s`: save (normalizes time, fills missing parent times from sub-items, regenerates totals)
+- `e`: open in-place editor for the selected day
+- `w`: open warnings overlay
+
+### Day edit mode
+
+- Type directly in ledger line format for the selected day
+- `Esc`: leave edit mode
+- `Ctrl+s`: validate and save current day edit
+- `←` / `→` / `↑` / `↓`: move cursor
+- Word jump:
+  - macOS: `Option+←` / `Option+→`
+  - non-macOS: `Ctrl+←` / `Ctrl+→`
+- Diagnostics panel navigation:
+  - `PgUp` / `PgDn`: scroll diagnostics
+  - `Home` / `End`: jump to start/end of diagnostics
+
+### Warnings overlay
+
+- `w`, `q`, or `Esc`: close overlay
+- `↑` / `↓`: scroll
+- `PgUp` / `PgDn`: page scroll
+- `Home` / `End`: jump to start/end
 
 ## Time format
 
@@ -74,3 +98,5 @@ cargo run -- --week-number 2026-02-08
 - `[x]` is a manual “counted” marker.
 - If a parent has no time but all sub-items do, the parent time is computed and written on save.
 - Totals are generated lines starting with `;;` and are safe to overwrite.
+- Day details in the right pane are shown in the same parent/sub-item structure as the ledger text.
+- In edit mode, diagnostics include parse errors and parent/sub-item time mismatches; saving is blocked until issues are fixed.
