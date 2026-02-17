@@ -418,8 +418,9 @@ dependencies = [
 
 [[package]]
 name = "edit_core"
-version = "0.1.0"
-source = "git+https://github.com/Riadabd/edit_core?tag=v0.2.0#5150f96034f4e4b879cf7f7fe339929693240efa"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6325440c6aaa853fd3abea4d98774ca9789d9f5f7a00db95a89e6a4b94b9132c"
 
 [[package]]
 name = "either"
