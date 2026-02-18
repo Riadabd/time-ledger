@@ -10,6 +10,8 @@ cargo run
 
 The app loads the current week from `data/YYYY-Www.ledger` (ISO week, Monday start).
 
+You can run the app immediately without pre-creating a ledger file. If the current week's file does not exist yet, edit any day and save (`Ctrl+s` in day edit mode), and the app will create the ledger automatically using the correct ISO year/week filename.
+
 To load ledgers from another directory:
 
 ```bash
