@@ -60,7 +60,7 @@ fn main_footer_line(app: &App) -> Line<'_> {
         Span::raw(" edit day  "),
         Span::styled("w", Style::default().add_modifier(Modifier::BOLD)),
         Span::raw(" show warnings  "),
-        Span::raw(&app.status),
+        status_span(app),
     ])
 }
 
@@ -76,7 +76,7 @@ fn edit_footer_line(app: &App) -> Line<'_> {
         Span::raw(" diagnostics scroll  "),
         Span::styled("Home/End", Style::default().add_modifier(Modifier::BOLD)),
         Span::raw(" diagnostics jump  "),
-        Span::raw(&app.status),
+        status_span(app),
     ])
 }
 
@@ -94,8 +94,16 @@ fn warnings_footer_line(app: &App) -> Line<'_> {
         Span::raw(" jump  "),
         Span::styled("w", Style::default().add_modifier(Modifier::BOLD)),
         Span::raw(" close warnings  "),
-        Span::raw(&app.status),
+        status_span(app),
     ])
+}
+
+fn status_span(app: &App) -> Span<'_> {
+    if app.status.starts_with("Warnings: ") && !app.week.warnings.is_empty() {
+        return Span::styled(app.status.as_str(), Style::default().fg(Color::Red));
+    }
+
+    Span::raw(app.status.as_str())
 }
 
 fn draw_week_table(frame: &mut Frame<'_>, app: &App, area: Rect) {
