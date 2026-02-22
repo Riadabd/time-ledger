@@ -8,17 +8,31 @@ Track time spent on tasks in a weekly view using a plain-text ledger file.
 cargo run
 ```
 
-The app loads the current week from `data/YYYY-Www.ledger` (ISO week, Monday start).
+The app loads the current week from `<ledger-dir>/YYYY-Www.ledger` (ISO week, Monday start).
 
 You can run the app immediately without pre-creating a ledger file. If the current week's file does not exist yet, edit any day and save (`Ctrl+s` in day edit mode), and the app will create the ledger automatically using the correct ISO year/week filename.
 
-To load ledgers from another directory:
+To load ledgers from another directory for a single run:
 
 ```bash
 cargo run -- --ledger-dir /path/to/ledger-dir
 ```
 
-If omitted, `--ledger-dir` defaults to `data/`.
+To configure a default ledger directory, create:
+
+`~/.config/time-ledger/config.toml`
+
+```toml
+ledger_dir = "/absolute/path/to/ledger-dir"
+```
+
+Resolution order:
+
+1. `--ledger-dir DIR`
+1. `$XDG_CONFIG_HOME/time-ledger/config.toml` (if set)
+1. `~/.config/time-ledger/config.toml`
+
+If no `ledger_dir` is provided through CLI or config, the app exits with an explicit error instead of creating a default `data/` directory.
 
 To print the ISO week number (`Wxx`) for today:
 

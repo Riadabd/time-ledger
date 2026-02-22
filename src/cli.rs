@@ -8,10 +8,10 @@ use clap::Parser;
 pub struct Cli {
     #[arg(
         long = "ledger-dir",
-        default_value = "data/",
-        help = "Directory containing weekly ledger files"
+        value_name = "DIR",
+        help = "Directory containing weekly ledger files (overrides config file)"
     )]
-    pub ledger_dir: PathBuf,
+    pub ledger_dir: Option<PathBuf>,
     #[arg(
         long = "week-number",
         value_name = "DATE",
@@ -47,7 +47,7 @@ mod tests {
     #[test]
     fn cli_uses_default_ledger_dir_when_flag_missing() {
         let cli = crate::cli::Cli::try_parse_from(["time-ledger"]).expect("default should parse");
-        assert_eq!(cli.ledger_dir, PathBuf::from("data"));
+        assert_eq!(cli.ledger_dir, None);
     }
 
     #[test]
@@ -55,14 +55,14 @@ mod tests {
         let cli =
             crate::cli::Cli::try_parse_from(["time-ledger", "--ledger-dir", "/tmp/my-ledgers"])
                 .expect("flag should parse");
-        assert_eq!(cli.ledger_dir, PathBuf::from("/tmp/my-ledgers"));
+        assert_eq!(cli.ledger_dir, Some(PathBuf::from("/tmp/my-ledgers")));
     }
 
     #[test]
     fn cli_supports_equals_form_ledger_dir() {
         let cli = crate::cli::Cli::try_parse_from(["time-ledger", "--ledger-dir=/tmp/my-ledgers"])
             .expect("flag should parse");
-        assert_eq!(cli.ledger_dir, PathBuf::from("/tmp/my-ledgers"));
+        assert_eq!(cli.ledger_dir, Some(PathBuf::from("/tmp/my-ledgers")));
     }
 
     #[test]

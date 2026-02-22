@@ -1,5 +1,6 @@
 mod app;
 mod cli;
+mod config;
 mod ledger;
 mod time_amount;
 mod ui;
@@ -19,6 +20,7 @@ use ratatui::backend::CrosstermBackend;
 
 use crate::app::App;
 use crate::cli::Cli;
+use crate::config::resolve_ledger_dir;
 use crate::ledger::{empty_week, load_week, week_file_path, week_start_for};
 
 fn main() {
@@ -37,14 +39,15 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let week_start = week_start_for(today);
-    let file_path = week_file_path(&cli.ledger_dir, today);
+    let ledger_dir = resolve_ledger_dir(cli.ledger_dir.as_deref())?;
+    let file_path = week_file_path(&ledger_dir, today);
 
     let mut week = load_week(&file_path, week_start)?;
     if week.days.is_empty() {
         week = empty_week(week.week_start);
     }
 
-    let mut app = App::new(week, file_path, cli.ledger_dir);
+    let mut app = App::new(week, file_path, ledger_dir);
     app.selected_day = today.weekday().num_days_from_monday() as usize;
 
     enable_raw_mode()?;
